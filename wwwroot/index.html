@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo JWT</title>
+<style>
+  :root{--primary:#4f46e5;--primary-d:#4338ca;--bg:#eef2ff;--card:#fff;--text:#1e293b;--muted:#64748b;--line:#e2e8f0;
+        --ok:#16a34a;--ok-bg:#dcfce7;--err:#dc2626;--err-bg:#fee2e2;--warn:#d97706;--warn-bg:#fef3c7}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI",system-ui,Arial,sans-serif;color:var(--text);
+       background:linear-gradient(135deg,#faf5ef 0%,#f1e6d8 100%);min-height:100vh}
+  header{background:linear-gradient(135deg,#8b5e3c,#5c3a21);color:#fff;padding:28px 16px 64px;text-align:center}
+  header h1{margin:0;font-size:26px}
+  header p{margin:6px 0 0;opacity:.85;font-size:14px}
+  main{max-width:720px;margin:-44px auto 40px;padding:0 16px;display:grid;gap:16px}
+  .card{background:var(--card);border-radius:14px;padding:20px;box-shadow:0 6px 20px rgba(30,41,59,.08)}
+  .card h2{margin:0 0 14px;font-size:16px;display:flex;align-items:center;gap:8px}
+  .step{background:var(--primary);color:#fff;border-radius:50%;width:24px;height:24px;display:inline-flex;
+        align-items:center;justify-content:center;font-size:13px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  input{flex:1;min-width:140px;padding:11px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;outline:none}
+  input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,.15)}
+  button{padding:11px 16px;border:0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;
+         background:var(--primary);color:#fff;transition:.15s}
+  button:hover{background:var(--primary-d)}
+  button.ghost{background:#f1f5f9;color:var(--text)}
+  button.ghost:hover{background:#e2e8f0}
+  button.green{background:#059669}button.green:hover{background:#047857}
+  button.red{background:#e11d48}button.red:hover{background:#be123c}
+  .status{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:14px;color:var(--muted)}
+  .dot{width:10px;height:10px;border-radius:50%;background:#cbd5e1}
+  .dot.on{background:var(--ok)}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700}
+  .badge.Admin{background:#fce7f3;color:#be185d}.badge.User{background:#dbeafe;color:#1d4ed8}
+  .hint{font-size:12px;color:var(--muted);margin-top:10px}
+  #result{border-radius:10px;padding:14px;background:#f8fafc;border:1px solid var(--line);min-height:56px}
+  #result .code{font-size:22px;font-weight:800}
+  #result.ok{background:var(--ok-bg);border-color:#86efac;color:#166534}
+  #result.err{background:var(--err-bg);border-color:#fca5a5;color:#991b1b}
+  #result.warn{background:var(--warn-bg);border-color:#fcd34d;color:#92400e}
+  #result pre{margin:8px 0 0;white-space:pre-wrap;font-family:Consolas,monospace;font-size:13px}
+  .token{font-family:Consolas,monospace;font-size:12px;word-break:break-all;background:#0f172a;color:#a5b4fc;
+         padding:12px;border-radius:10px;max-height:110px;overflow:auto}
+  .claims{margin-top:10px;display:grid;grid-template-columns:90px 1fr;gap:4px 10px;font-size:13px}
+  .claims span:nth-child(odd){color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>🔐 Demo xác thực JWT</h1>
+  <p>Đăng nhập → server cấp JWT → gửi JWT khi gọi API → server cho phép / từ chối</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2><span class="step">1</span> Đăng nhập</h2>
+    <div class="row">
+      <input id="u" placeholder="Tên đăng nhập" value="user" autocomplete="username">
+      <input id="p" type="password" placeholder="Mật khẩu" value="123456" autocomplete="current-password">
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button onclick="login()">Đăng nhập</button>
+      <button class="ghost" onclick="register()">Đăng ký</button>
+      <button class="ghost" onclick="logout()">Đăng xuất</button>
+    </div>
+    <div class="status"><span class="dot" id="dot"></span><span id="who">Chưa đăng nhập</span></div>
+    <div class="hint">Tài khoản mẫu: <b>admin / 123456</b> và <b>user / 123456</b></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">2</span> Gọi API kèm JWT</h2>
+    <div class="row">
+      <button class="ghost" onclick="callApi('/api/demo/public')">🌐 API Public</button>
+      <button class="green" onclick="callApi('/api/demo/user-area')">👤 API User</button>
+      <button class="red" onclick="callApi('/api/demo/admin-area')">🛡️ API Admin</button>
+    </div>
+    <div class="hint">Public: ai cũng gọi được · User: cần đăng nhập · Admin: chỉ role Admin (trả danh sách user trong DB)</div>
+  </section>
+
+  <section class="card">
+    <h2><span class="step">3</span> Kết quả từ server</h2>
+    <div id="result">Chưa có thao tác nào.</div>
+  </section>
+
+  <section class="card">
+    <h2>🔑 JWT hiện tại</h2>
+    <div class="token" id="tk">(chưa có)</div>
+    <div class="claims" id="claims"></div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const ROLE = 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role';
+const NAME = 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name';
+
+function decode(t){
+  try{
+    const b = t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    return JSON.parse(decodeURIComponent(escape(atob(b))));
+  }catch{ return null; }
+}
+
+function refresh(){
+  const t = localStorage.getItem('jwt');
+  const c = t ? decode(t) : null;
+  $('tk').textContent = t || '(chưa có)';
+  if(c){
+    const name = c[NAME] || c.unique_name || c.name, role = c[ROLE] || c.role;
+    $('dot').classList.add('on');
+    $('who').innerHTML = 'Đang đăng nhập: <b>'+name+'</b> <span class="badge '+role+'">'+role+'</span>';
+    $('claims').innerHTML = '<span>Tên</span><span>'+name+'</span><span>Role</span><span>'+role+
+      '</span><span>Hết hạn</span><span>'+new Date(c.exp*1000).toLocaleString('vi-VN')+'</span>';
+  }else{
+    $('dot').classList.remove('on');
+    $('who').textContent = 'Chưa đăng nhập';
+    $('claims').innerHTML = '';
+  }
+}
+
+function show(cls, code, text, body){
+  const r = $('result');
+  r.className = cls;
+  r.innerHTML = '<div class="code">'+code+'</div><div>'+text+'</div>'+(body?'<pre></pre>':'');
+  if(body) r.querySelector('pre').textContent = body;
+}
+
+async function login(){
+  const res = await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:$('u').value,password:$('p').value})});
+  const d = await res.json();
+  if(res.ok){ localStorage.setItem('jwt',d.token); show('ok',res.status,'Đăng nhập thành công, server đã trả JWT (role: '+d.role+')'); }
+  else show('err',res.status,d.message);
+  refresh();
+}
+
+async function register(){
+  const res = await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:$('u').value,password:$('p').value})});
+  const d = await res.json();
+  show(res.ok?'ok':'err',res.status,d.message);
+}
+
+function logout(){ localStorage.removeItem('jwt'); refresh(); show('warn','—','Đã đăng xuất, JWT đã bị xóa khỏi trình duyệt.'); }
+
+async function callApi(url){
+  const h = {}, t = localStorage.getItem('jwt');
+  if(t) h['Authorization'] = 'Bearer ' + t;
+  const res = await fetch(url,{headers:h});
+  const txt = await res.text();
+  let body = txt; try{ body = JSON.stringify(JSON.parse(txt),null,2); }catch{}
+  if(res.status===200) show('ok','200 Authorized','Server cho phép truy cập '+url, body);
+  else if(res.status===401) show('err','401 Unauthorized','Chưa đăng nhập, hoặc token sai / hết hạn.');
+  else if(res.status===403) show('warn','403 Forbidden','Đã đăng nhập nhưng role không đủ quyền để vào chức năng này.');
+  else show('err',res.status,'Lỗi khác');
+}
+
+refresh();
+</script>
+</body>
+</html>
